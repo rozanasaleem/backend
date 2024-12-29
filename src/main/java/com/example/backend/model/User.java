@@ -16,7 +16,6 @@ import java.util.List;
 @Data
 @Getter
 @Setter
-
 public class User implements UserDetails {
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE)
@@ -33,7 +32,7 @@ public class User implements UserDetails {
 
     private boolean enabled;
 
-    @Column(name="verification_code")
+    @Column(name="verification_codee")
     private String verificationCode;
 
     @Column(name="verificationExpiration")

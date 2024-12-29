@@ -20,4 +20,7 @@ public class UserService {
         userRepository.findAll().forEach(users::add);
         return users;
     }
+
+    public Object findByUsername(String username) {
+        return username;}
 }

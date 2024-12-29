@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -21,11 +22,17 @@ public class UserController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<User> authenticatedUser() {
+    public ResponseEntity<?> authenticatedUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        User currentUser = (User) authentication.getPrincipal();
-        return ResponseEntity.ok(currentUser);
+        Object principal = authentication.getPrincipal();
+
+        if (principal instanceof UserDetails userDetails) {
+            return ResponseEntity.ok(userService.findByUsername(userDetails.getUsername()));
+        }
+
+        return ResponseEntity.badRequest().body("Could not retrieve user details");
     }
+
 
     @GetMapping("/")
     public ResponseEntity<List<User>> allUsers() {
