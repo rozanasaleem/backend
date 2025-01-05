@@ -2,19 +2,18 @@ package com.example.backend.controller;
 
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
-
+import com.example.backend.model.User;
 import com.example.backend.dto.LoginUserDto;
 import com.example.backend.dto.RegisterUserDto;
-import com.example.backend.dto.VerifyUserDto;
-import com.example.backend.model.User;
 import com.example.backend.response.LoginResponse;
 import com.example.backend.service.AuthenticationService;
 import com.example.backend.service.JwtService;
+import com.example.backend.dto.PasswordResetRequest;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-@RequestMapping("/auth")
+@RequestMapping("/api/auth")
 @RestController
 public class AuthenticationController {
 
@@ -40,6 +39,7 @@ public class AuthenticationController {
         return ResponseEntity.ok(loginResponse);
     }
 
+    /*
     @PostMapping("/verify")
     public ResponseEntity<?> verifyUser(@RequestBody VerifyUserDto verifyUserDto) {
         try {
@@ -58,6 +58,18 @@ public class AuthenticationController {
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
+    } */
+
+    @PostMapping("/password-res et-request")
+    public ResponseEntity<String> requestPasswordReset(@RequestBody PasswordResetRequest request) {
+        authenticationService.initiatePasswordReset(request.getEmail());
+        return ResponseEntity.ok("Password reset email sent");
+    }
+    
+    @PostMapping("/password-reset")
+    public ResponseEntity<String> resetPassword(@RequestBody PasswordResetRequest request) {
+        authenticationService.resetPassword(request);
+        return ResponseEntity.ok("Password successfully reset");
     }
 }
 

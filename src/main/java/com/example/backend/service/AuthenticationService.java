@@ -1,22 +1,20 @@
 package com.example.backend.service;
-
-
 import com.example.backend.dto.LoginUserDto;
 import com.example.backend.dto.RegisterUserDto;
-import com.example.backend.dto.VerifyUserDto;
+import com.example.backend.dto.PasswordResetRequest;
 import com.example.backend.model.User;
 import com.example.backend.repository.UserRepository;
-import jakarta.mail.MessagingException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.Optional;
-import java.util.Random;
+import java.util.UUID;
 
 @Service
+@Transactional
 public class AuthenticationService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -36,11 +34,17 @@ public class AuthenticationService {
     }
 
     public User signup(RegisterUserDto input) {
-        User user = new User(input.getUsername(), input.getEmail(), passwordEncoder.encode(input.getPassword()));
-        user.setVerificationCode(generateVerificationCode());
-        user.setVerificationCodeExpiresAt(LocalDateTime.now().plusMinutes(15));
-        user.setEnabled(false);
-        sendVerificationEmail(user);
+        // Check if user already exists
+        if (userRepository.findByEmail(input.getEmail()).isPresent()) {
+            throw new RuntimeException("User already exists");
+        }
+
+        // Create new user
+        User user = new User();
+        user.setUsername(input.getUsername());
+        user.setEmail(input.getEmail());
+        user.setPassword(passwordEncoder.encode(input.getPassword()));
+        
         return userRepository.save(user);
     }
 
@@ -48,9 +52,10 @@ public class AuthenticationService {
         User user = userRepository.findByEmail(input.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        if (!user.isEnabled()) {
+        /*if (!user.isEnabled()) {
             throw new RuntimeException("Account not verified. Please verify your account.");
-        }
+        }*/
+
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         input.getEmail(),
@@ -61,7 +66,41 @@ public class AuthenticationService {
         return user;
     }
 
-    public void verifyUser(VerifyUserDto input) {
+    public void initiatePasswordReset(String email) {
+        User user = userRepository.findByEmail(email)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        String token = generateResetToken();
+        user.setResetToken(token);
+        user.setResetTokenExpiry(LocalDateTime.now().plusHours(1));
+        
+        userRepository.save(user);
+        
+        // Send the reset email
+        emailService.sendPasswordResetEmail(user.getEmail(), token);
+    }
+
+    public void resetPassword(PasswordResetRequest request) {
+        User user = userRepository.findByResetToken(request.getToken())
+            .orElseThrow(() -> new RuntimeException("Invalid token"));
+        
+        if (user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
+            throw new RuntimeException("Token expired");
+        }
+        
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setResetToken(null);
+        user.setResetTokenExpiry(null);
+        
+        userRepository.save(user);
+    }
+
+    private String generateResetToken() {
+        return UUID.randomUUID().toString();
+    }
+}
+
+    /*public void verifyUser(VerifyUserDto input) {
         Optional<User> optionalUser = userRepository.findByEmail(input.getEmail());
         if (optionalUser.isPresent()) {
             User user = optionalUser.get();
@@ -126,3 +165,4 @@ public class AuthenticationService {
         return String.valueOf(code);
     }
 }
+*/
