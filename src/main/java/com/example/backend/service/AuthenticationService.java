@@ -34,36 +34,60 @@ public class AuthenticationService {
     }
 
     public User signup(RegisterUserDto input) {
-        // Check if user already exists
-        if (userRepository.findByEmail(input.getEmail()).isPresent()) {
-            throw new RuntimeException("User already exists");
-        }
+        try {
+            // Check if user already exists
+            if (userRepository.findByEmail(input.getEmail()).isPresent()) {
+                throw new RuntimeException("User already exists with email: " + input.getEmail());
+            }
 
-        // Create new user
-        User user = new User();
-        user.setUsername(input.getUsername());
-        user.setEmail(input.getEmail());
-        user.setPassword(passwordEncoder.encode(input.getPassword()));
-        
-        return userRepository.save(user);
+            // Create new user
+            User user = new User();
+            user.setUsername(input.getUsername());
+            user.setEmail(input.getEmail());
+            user.setPassword(passwordEncoder.encode(input.getPassword()));
+            user.setEnabled(true);
+            
+            User savedUser = userRepository.save(user);
+            System.out.println("User successfully created: " + savedUser.getEmail() + ", enabled: " + savedUser.isEnabled());
+            return savedUser;
+        } catch (Exception e) {
+            System.err.println("Error during signup: " + e.getMessage());
+            throw new RuntimeException("Failed to create user: " + e.getMessage());
+        }
     }
 
     public User authenticate(LoginUserDto input) {
-        User user = userRepository.findByEmail(input.getEmail())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        try {
+            System.out.println("Attempting to authenticate user with email: " + input.getEmail());
+            
+            User user = userRepository.findByEmail(input.getEmail())
+                    .orElseThrow(() -> new RuntimeException("User not found with email: " + input.getEmail()));
+            
+            if (!user.isEnabled()) {
+                System.err.println("User account is not enabled: " + user.getEmail());
+                throw new RuntimeException("Account is not enabled");
+            }
+            
+            System.out.println("Found user: " + user.getEmail() + ", enabled: " + user.isEnabled());
+            
+            try {
+                authenticationManager.authenticate(
+                        new UsernamePasswordAuthenticationToken(
+                                input.getEmail(),
+                                input.getPassword()
+                        )
+                );
+                System.out.println("Authentication successful");
+            } catch (Exception e) {
+                System.err.println("Authentication failed: " + e.getMessage());
+                throw e;
+            }
 
-        /*if (!user.isEnabled()) {
-            throw new RuntimeException("Account not verified. Please verify your account.");
-        }*/
-
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        input.getEmail(),
-                        input.getPassword()
-                )
-        );
-
-        return user;
+            return user;
+        } catch (Exception e) {
+            System.err.println("Authentication failed: " + e.getMessage());
+            throw e;
+        }
     }
 
     public void initiatePasswordReset(String email) {
@@ -99,70 +123,3 @@ public class AuthenticationService {
         return UUID.randomUUID().toString();
     }
 }
-
-    /*public void verifyUser(VerifyUserDto input) {
-        Optional<User> optionalUser = userRepository.findByEmail(input.getEmail());
-        if (optionalUser.isPresent()) {
-            User user = optionalUser.get();
-            if (user.getVerificationCodeExpiresAt().isBefore(LocalDateTime.now())) {
-                throw new RuntimeException("Verification code has expired");
-            }
-            if (user.getVerificationCode().equals(input.getVerificationCode())) {
-                user.setEnabled(true);
-                user.setVerificationCode(null);
-                user.setVerificationCodeExpiresAt(null);
-                userRepository.save(user);
-            } else {
-                throw new RuntimeException("Invalid verification code");
-            }
-        } else {
-            throw new RuntimeException("User not found");
-        }
-    }
-
-    public void resendVerificationCode(String email) {
-        Optional<User> optionalUser = userRepository.findByEmail(email);
-        if (optionalUser.isPresent()) {
-            User user = optionalUser.get();
-            if (user.isEnabled()) {
-                throw new RuntimeException("Account is already verified");
-            }
-            user.setVerificationCode(generateVerificationCode());
-            user.setVerificationCodeExpiresAt(LocalDateTime.now().plusHours(1));
-            sendVerificationEmail(user);
-            userRepository.save(user);
-        } else {
-            throw new RuntimeException("User not found");
-        }
-    }
-
-    private void sendVerificationEmail(User user) { //TODO: Update with company logo
-        String subject = "Account Verification";
-        String verificationCode = "VERIFICATION CODE " + user.getVerificationCode();
-        String htmlMessage = "<html>"
-                + "<body style=\"font-family: Arial, sans-serif;\">"
-                + "<div style=\"background-color: #f5f5f5; padding: 20px;\">"
-                + "<h2 style=\"color: #333;\">Welcome to our app!</h2>"
-                + "<p style=\"font-size: 16px;\">Please enter the verification code below to continue:</p>"
-                + "<div style=\"background-color: #fff; padding: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1);\">"
-                + "<h3 style=\"color: #333;\">Verification Code:</h3>"
-                + "<p style=\"font-size: 18px; font-weight: bold; color: #007bff;\">" + verificationCode + "</p>"
-                + "</div>"
-                + "</div>"
-                + "</body>"
-                + "</html>";
-
-        try {
-            emailService.sendVerificationEmail(user.getEmail(), subject, htmlMessage);
-        } catch (MessagingException e) {
-            // Handle email sending exception
-            e.printStackTrace();
-        }
-    }
-    private String generateVerificationCode() {
-        Random random = new Random();
-        int code = random.nextInt(900000) + 100000;
-        return String.valueOf(code);
-    }
-}
-*/

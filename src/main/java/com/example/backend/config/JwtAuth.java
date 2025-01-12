@@ -41,36 +41,46 @@ public class JwtAuth extends OncePerRequestFilter {
             @NonNull HttpServletResponse response,
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
-        final String authHeader = request.getHeader("Authorization");
-
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        String path = request.getServletPath();
+        System.out.println("Processing request to: " + path);
+        
+        // Skip authentication for login and signup endpoints
+        if (path.contains("/api/auth/login") || path.contains("/api/auth/signup")) {
+            System.out.println("Skipping authentication for public endpoint: " + path);
             filterChain.doFilter(request, response);
             return;
         }
 
-        try {
-            final String jwt = authHeader.substring(7);
-            final String userEmail = jwtService.extractUsername(jwt);
+        final String authHeader = request.getHeader("Authorization");
+        System.out.println("Auth header: " + (authHeader != null ? "present" : "missing"));
 
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            if (userEmail != null && authentication == null) {
-                UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
-
-                if (jwtService.isTokenValid(jwt, userDetails)) {
-                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                            userDetails,
-                            null,
-                            userDetails.getAuthorities()
-                    );
-
-                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
-                }
-            }
-
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            System.out.println("No valid auth header found");
             filterChain.doFilter(request, response);
-        } catch (Exception exception) {
-            handlerExceptionResolver.resolveException(request, response, null, exception);
+            return;
         }
+
+        final String jwt = authHeader.substring(7);
+        final String userEmail = jwtService.extractUsername(jwt);
+        System.out.println("Extracted email: " + userEmail);
+
+        if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
+            System.out.println("User details loaded: " + userDetails.getUsername());
+            
+            if (jwtService.isTokenValid(jwt, userDetails)) {
+                System.out.println("Token is valid");
+                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                        userDetails,
+                        null,
+                        userDetails.getAuthorities()
+                );
+                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                SecurityContextHolder.getContext().setAuthentication(authToken);
+            } else {
+                System.out.println("Token validation failed");
+            }
+        }
+        filterChain.doFilter(request, response);
     }
 }
